@@ -11,6 +11,7 @@ from app.agent.tools.registry import TOOL_REGISTRY, get_tool_declarations
 
 import app.agent.tools.base_tools      # noqa: F401
 import app.agent.tools.password_reset  # noqa: F401
+import app.agent.tools.accounts        # noqa: F401
 import app.agent.tools.tickets         # noqa: F401
 import app.agent.tools.faq             # noqa: F401
 import app.agent.tools.troubleshooting  # noqa: F401
@@ -77,7 +78,8 @@ _KEYWORD_TOOLS: list[tuple[list[str], list[str]]] = [
          "send_notification", "restart_session"],
     ),
     (
-        ["usuario", "cuenta", "bloqueado", "unlock", "verificaci", "sesión revocar"],
+        ["usuario", "cuenta", "bloqueado", "unlock", "verificaci", "sesión revocar",
+         "credencial", "acceso", "identidad", "desbloquea", "bloquea", "estado de"],
         ["unlock_account", "check_account_status",
          "resend_verification", "manage_session", "validate_identity"],
     ),

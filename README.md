@@ -1,6 +1,6 @@
 # ATOS — Agente Técnico de Operaciones de Soporte
 
-Agente de helpdesk inteligente con Gemini 2.5 Flash, FastAPI, PostgreSQL y React.
+Agente de helpdesk inteligente con Groq (llama-3.3-70b-versatile), FastAPI, PostgreSQL y React.
 
 ## Requisitos
 
@@ -15,10 +15,10 @@ Agente de helpdesk inteligente con Gemini 2.5 Flash, FastAPI, PostgreSQL y React
 
 ```bash
 cp backend/.env.example backend/.env
-# Editar backend/.env y poner tu GEMINI_API_KEY y SECRET_KEY
+# Editar backend/.env y poner tu GROQ_API_KEY y SECRET_KEY
 ```
 
-Obtén tu API key gratuita en: https://aistudio.google.com/apikey
+Obtén tu API key gratuita en: https://console.groq.com
 
 ### 2. Levantar el backend
 
@@ -66,7 +66,7 @@ Ver instrucciones completas en [cloudflare-tunnel.md](./cloudflare-tunnel.md)
 
 | Capa | Tecnología |
 |------|-----------|
-| IA | Gemini 2.5 Flash (gratis) |
+| IA | Groq — llama-3.3-70b-versatile (gratis) |
 | Backend | Python 3.12 + FastAPI |
 | Base de datos | PostgreSQL 16 |
 | Frontend | React 18 + Vite + TypeScript |
