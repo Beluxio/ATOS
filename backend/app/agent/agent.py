@@ -1,4 +1,5 @@
 import json
+import re
 import logging
 from typing import Any, Optional
 from groq import AsyncGroq, APIStatusError
@@ -41,8 +42,10 @@ _KEYWORD_TOOLS: list[tuple[list[str], list[str]]] = [
         ["request_password_reset", "validate_reset_token", "confirm_password_reset"],
     ),
     (
-        ["ticket", "incidencia", "issue", "escalar", "prioridad"],
-        ["get_ticket", "list_tickets", "update_ticket_status", "escalate_ticket", "detect_duplicate_tickets"],
+        ["ticket", "incidencia", "issue", "escalar", "prioridad",
+         "responder", "respuesta", "nota", "comentar", "duplicado"],
+        ["get_ticket", "list_tickets", "update_ticket_status", "escalate_ticket",
+         "detect_duplicate_tickets", "add_ticket_response"],
     ),
     (
         ["faq", "pregunta", "documenta", "base de conocimiento"],
@@ -132,6 +135,22 @@ def _trim_history(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return result
 
 
+_TEXT_TOOL_RE = re.compile(r"<function=(\w+)>(.*?)</function>", re.DOTALL)
+
+
+def _parse_text_tool_calls(text: str) -> list[dict]:
+    """Detect <function=name>{...}</function> format that llama emits when structured tool_calls fail."""
+    matches = _TEXT_TOOL_RE.findall(text)
+    calls = []
+    for i, (name, args_str) in enumerate(matches):
+        try:
+            args = json.loads(args_str.strip())
+        except json.JSONDecodeError:
+            args = {}
+        calls.append({"id": f"text_call_{i}", "name": name, "args": args})
+    return calls
+
+
 async def chat(
     message: str,
     history: list[dict[str, Any]],
@@ -206,8 +225,30 @@ async def chat(
                     "content": json.dumps(result, ensure_ascii=False),
                 })
         else:
-            response_text = assistant_msg.content or ""
-            break
+            raw_text = assistant_msg.content or ""
+            text_calls = _parse_text_tool_calls(raw_text)
+            if text_calls:
+                # Model used text-format tool calls instead of structured — execute them
+                for call in text_calls:
+                    result = await _execute_tool(call["name"], call["args"], db, session_id)
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": call["id"],
+                        "content": json.dumps(result, ensure_ascii=False),
+                    })
+                # Patch the assistant message to include tool_calls so the next turn is valid
+                messages[-len(text_calls) - 1]["tool_calls"] = [
+                    {
+                        "id": c["id"],
+                        "type": "function",
+                        "function": {"name": c["name"], "arguments": json.dumps(c["args"])},
+                    }
+                    for c in text_calls
+                ]
+                messages[-len(text_calls) - 1]["content"] = ""
+            else:
+                response_text = raw_text
+                break
 
     updated_history = messages[1:]
     return response_text, updated_history

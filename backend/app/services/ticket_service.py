@@ -168,6 +168,45 @@ async def add_response(
     return {"status": "ok", "message": "Respuesta añadida."}
 
 
+async def find_duplicates(
+    db: AsyncSession,
+    title: str,
+    description: str,
+    user_email: str,
+    limit: int = 5,
+) -> list[dict]:
+    """Return open/in_progress tickets from the same user that share keywords with the new one."""
+    text_new = (title + " " + description).lower()
+    terms = [t for t in text_new.split() if len(t) > 3]
+
+    q = select(Ticket).where(
+        Ticket.user_email == user_email.strip().lower(),
+        Ticket.status.in_(["open", "in_progress"]),
+    ).order_by(Ticket.created_at.desc()).limit(50)
+    result = await db.execute(q)
+    candidates = result.scalars().all()
+
+    scored = []
+    for ticket in candidates:
+        blob = (ticket.title + " " + ticket.description).lower()
+        score = sum(1 for t in terms if t in blob)
+        if score > 0:
+            scored.append((score, ticket))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [
+        {
+            "id": t.id,
+            "title": t.title,
+            "status": t.status,
+            "priority": t.priority,
+            "created_at": t.created_at.isoformat(),
+            "similarity_score": score,
+        }
+        for score, t in scored[:limit]
+    ]
+
+
 # ── Helpers ──────────────────────────────────────────────────
 
 def _serialize(t: Ticket) -> dict:

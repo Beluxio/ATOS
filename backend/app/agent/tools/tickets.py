@@ -1,6 +1,7 @@
 from app.agent.tools.registry import register
 from app.core.database import AsyncSessionLocal
 from app.services import ticket_service as svc
+from app.services.ticket_service import find_duplicates
 
 
 @register({
@@ -136,3 +137,47 @@ async def escalate_ticket(args: dict) -> dict:
 async def add_ticket_response(args: dict) -> dict:
     async with AsyncSessionLocal() as db:
         return await svc.add_response(db, args["ticket_id"], args["content"], args.get("author", "ATOS"))
+
+
+@register({
+    "type": "function",
+    "function": {
+        "name": "detect_duplicate_tickets",
+        "description": (
+            "Busca tickets abiertos del mismo usuario que puedan ser duplicados del problema "
+            "que se está reportando. Úsala ANTES de crear un ticket para evitar duplicados. "
+            "Retorna tickets similares ordenados por relevancia."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title":       {"type": "string", "description": "Título del nuevo ticket a comparar."},
+                "description": {"type": "string", "description": "Descripción del nuevo ticket a comparar."},
+                "user_email":  {"type": "string", "description": "Email del usuario para buscar solo sus tickets abiertos."},
+            },
+            "required": ["title", "description", "user_email"],
+        },
+    },
+})
+async def detect_duplicate_tickets(args: dict) -> dict:
+    async with AsyncSessionLocal() as db:
+        duplicates = await find_duplicates(
+            db,
+            title=args["title"],
+            description=args["description"],
+            user_email=args["user_email"],
+        )
+    if not duplicates:
+        return {
+            "duplicates_found": False,
+            "message": "No se encontraron tickets similares abiertos. Puedes crear el ticket.",
+        }
+    return {
+        "duplicates_found": True,
+        "count": len(duplicates),
+        "similar_tickets": duplicates,
+        "suggestion": (
+            f"Encontré {len(duplicates)} ticket(s) similar(es) abierto(s). "
+            "Considera actualizar uno existente en lugar de crear uno nuevo."
+        ),
+    }
