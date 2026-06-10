@@ -1,8 +1,15 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Any, Optional
 
 
 class ChatRequest(BaseModel):
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "message": "Necesito resetear la contraseña de usuario@empresa.com",
+            "session_id": "sesion-001",
+            "history": [],
+        }
+    })
     message: str
     session_id: str
     history: list[dict[str, Any]] = []

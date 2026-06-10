@@ -1,6 +1,6 @@
 import type { AuthUser } from "../hooks/useAuth";
 
-export type View = "chat" | "users" | "tickets" | "faq" | "troubleshooting" | "environment" | "history" | "logs";
+export type View = "chat" | "users" | "tickets" | "faq" | "troubleshooting" | "environment" | "history" | "logs" | "db-access" | "dashboard";
 
 interface NavItem {
   id: View;
@@ -8,17 +8,20 @@ interface NavItem {
   label: string;
   badge?: string;
   section?: string;
+  roles?: string[];
 }
 
 const NAV: NavItem[] = [
-  { id: "chat",    icon: "💬", label: "Chat ATOS",  section: "Agente" },
-  { id: "users",   icon: "👥", label: "Usuarios",   section: "Gestión" },
-  { id: "tickets", icon: "🎫", label: "Tickets",    section: "" },
+  { id: "dashboard", icon: "📊", label: "Dashboard",  section: "General", roles: ["admin", "agent"] },
+  { id: "chat",      icon: "💬", label: "Chat ATOS",  section: "Agente" },
+  { id: "users",     icon: "👥", label: "Usuarios",   section: "Gestión", roles: ["admin", "agent"] },
+  { id: "tickets",   icon: "🎫", label: "Tickets",    section: "" },
+  { id: "db-access", icon: "🗄️", label: "DB Access",  section: "", roles: ["admin", "agent"] },
   { id: "faq",             icon: "❓", label: "FAQ" },
   { id: "troubleshooting", icon: "🔧", label: "Troubleshooting" },
   { id: "environment",     icon: "⚙",  label: "Entorno" },
   { id: "history",         icon: "🧠", label: "Historial" },
-  { id: "logs",            icon: "📋", label: "Audit Logs", section: "Sistema" },
+  { id: "logs",            icon: "📋", label: "Audit Logs", section: "Sistema", roles: ["admin", "agent"] },
 ];
 
 const ROLE_COLORS: Record<string, string> = {
@@ -51,7 +54,7 @@ export function Sidebar({ active, onChange, backendOnline, user, onLogout }: Pro
       </div>
 
       <nav className="sidebar-nav">
-        {NAV.map((item) => {
+        {NAV.filter(item => !item.roles || item.roles.includes(user.role)).map((item) => {
           const showSection = item.section && item.section !== lastSection;
           if (item.section) lastSection = item.section;
           const disabled = item.badge === "pronto";

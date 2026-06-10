@@ -9,6 +9,8 @@ import { FAQView } from "./components/FAQView";
 import { TroubleshootingView } from "./components/TroubleshootingView";
 import { EnvironmentView } from "./components/EnvironmentView";
 import { HistoryView } from "./components/HistoryView";
+import { DatabaseAccessView } from "./components/DatabaseAccessView";
+import { DashboardView } from "./components/DashboardView";
 import { useChat } from "./hooks/useChat";
 import { useAuth } from "./hooks/useAuth";
 import "./App.css";
@@ -23,6 +25,8 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
   environment:     { title: "⚙ Entorno",            subtitle: "Validación de herramientas, versiones y recursos del sistema" },
   history:         { title: "🧠 Historial",          subtitle: "Memoria de incidencias y soluciones probadas por ATOS" },
   logs:            { title: "📋 Audit Logs",        subtitle: "Historial de acciones ejecutadas por ATOS" },
+  "db-access":     { title: "🗄️ DB Access",         subtitle: "Gestión de accesos a bases de datos" },
+  dashboard:       { title: "📊 Dashboard",          subtitle: "Métricas y estado general del sistema" },
 };
 
 export default function App() {
@@ -92,6 +96,8 @@ export default function App() {
           {view === "troubleshooting" && <TroubleshootingView />}
           {view === "environment"     && <EnvironmentView token={token} />}
           {view === "history"         && <HistoryView token={token} />}
+          {view === "db-access"      && <DatabaseAccessView token={token} />}
+          {view === "dashboard"      && <DashboardView token={token} />}
         </div>
       </div>
     </div>

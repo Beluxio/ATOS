@@ -2,7 +2,7 @@ import json
 import re
 import logging
 from typing import Any, Optional
-from groq import AsyncGroq, APIStatusError
+from openai import AsyncOpenAI, APIStatusError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -20,13 +20,12 @@ import app.agent.tools.dependencies       # noqa: F401
 import app.agent.tools.environment        # noqa: F401
 import app.agent.tools.automated_actions  # noqa: F401
 import app.agent.tools.memory             # noqa: F401
+import app.agent.tools.database_access   # noqa: F401
 
 logger = logging.getLogger(__name__)
 
-_client = AsyncGroq(api_key=settings.groq_api_key)
-# llama3-groq-8b-8192-tool-use-preview is fine-tuned specifically for tool use
-# and generates well-formed JSON arguments reliably on the free tier.
-MODEL = "llama-3.3-70b-versatile"
+_client = AsyncOpenAI(api_key=settings.openai_api_key)
+MODEL = settings.openai_model
 
 # ── Tool routing ───────────────────────────────────────────────
 # Sending all 30+ tools on every request consumes ~6k tokens of declarations.
@@ -85,6 +84,13 @@ _KEYWORD_TOOLS: list[tuple[list[str], list[str]]] = [
          "credencial", "acceso", "identidad", "desbloquea", "bloquea", "estado de"],
         ["unlock_account", "check_account_status",
          "resend_verification", "manage_session", "validate_identity"],
+    ),
+    (
+        ["base de datos", "database", "db", "acceso a bd", "credencial bd",
+         "otorgar acceso", "revocar acceso", "dataco", "warehouse", "reporting",
+         "job role", "rol de trabajo", "frontend dev", "backend dev", "data scientist"],
+        ["grant_database_access", "revoke_database_access", "reset_database_password",
+         "check_database_access", "list_database_users", "assign_job_role"],
     ),
 ]
 
@@ -175,24 +181,10 @@ async def chat(
                 messages=messages,
                 tools=tools,
                 tool_choice="auto",
-                max_tokens=1024,
+                max_completion_tokens=1024,
             )
         except APIStatusError as e:
-            body = e.body or {}
-            code = body.get("error", {}).get("code", "") if isinstance(body, dict) else ""
-            # Retry without tools only for tool_use_failed (malformed JSON args)
-            if e.status_code == 400 and code == "tool_use_failed" and tools:
-                logger.warning("tool_use_failed — retrying without tools")
-                try:
-                    response = await _client.chat.completions.create(
-                        model=MODEL,
-                        messages=messages,
-                        max_tokens=1024,
-                    )
-                except APIStatusError as inner:
-                    raise RuntimeError(f"Error de la API de Groq ({inner.status_code})") from inner
-            else:
-                raise RuntimeError(f"Error de la API de Groq ({e.status_code}): {e.message}") from e
+            raise RuntimeError(f"Error de la API de OpenAI ({e.status_code}): {e.message}") from e
 
         choice = response.choices[0]
         assistant_msg = choice.message

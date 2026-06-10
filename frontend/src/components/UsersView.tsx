@@ -6,7 +6,7 @@ interface Props {
 }
 
 export function UsersView({ token }: Props) {
-  const { accounts, loading, error, success, fetchAccounts, register, toggleLock } =
+  const { accounts, loading, error, success, fetchAccounts, register, toggleLock, updateJobRole } =
     useAccounts(token);
 
   const [form, setForm] = useState({ email: "", username: "", password: "", role: "user" });
@@ -113,6 +113,7 @@ export function UsersView({ token }: Props) {
                   <th>Usuario</th>
                   <th>Email</th>
                   <th>Rol</th>
+                  <th>Job Role</th>
                   <th>Estado</th>
                   <th>Intentos</th>
                   <th>Creada</th>
@@ -127,6 +128,20 @@ export function UsersView({ token }: Props) {
                     <td>{acc.email}</td>
                     <td>
                       <span className={`badge role-${acc.role}`}>{acc.role}</span>
+                    </td>
+                    <td>
+                      <select
+                        value={acc.job_role ?? ""}
+                        onChange={e => updateJobRole(acc.email, e.target.value || null)}
+                        style={{ fontSize: 11, padding: "2px 6px", background: "var(--surface)",
+                          border: "1px solid var(--border)", borderRadius: 6, color: acc.job_role ? "#818cf8" : "#44445a",
+                          cursor: "pointer" }}
+                      >
+                        <option value="">— sin rol —</option>
+                        <option value="frontend_dev">Frontend Dev</option>
+                        <option value="backend_dev">Backend Dev</option>
+                        <option value="data_scientist">Data Scientist</option>
+                      </select>
                     </td>
                     <td>
                       <span className={`badge ${acc.status}`}>{acc.status}</span>

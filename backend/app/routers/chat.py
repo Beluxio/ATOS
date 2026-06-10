@@ -2,7 +2,6 @@ import logging
 from typing import Optional
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from groq import APIStatusError
 
 from app.core.database import get_db
 from app.core.auth import get_current_user_optional
@@ -13,21 +12,20 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
-def _groq_error_msg(e: APIStatusError) -> str:
-    raw = str(e)
-    if e.status_code == 429:
-        return "⚠️ Límite de requests de Groq alcanzado. Espera unos segundos e intenta de nuevo."
-    if e.status_code == 401:
-        return "⚠️ GROQ_API_KEY inválida. Actualízala en .env y reinicia con: docker-compose up -d --force-recreate api"
-    return f"⚠️ Error de la API de Groq ({e.status_code}): {raw[:200]}"
-
-
-@router.post("", response_model=ChatResponse)
+@router.post("", response_model=ChatResponse, summary="Enviar mensaje al agente")
 async def chat_endpoint(
     body: ChatRequest,
     db: AsyncSession = Depends(get_db),
     current_user: Optional[dict] = Depends(get_current_user_optional),
 ):
+    """
+    Envía un mensaje al agente ATOS y recibe una respuesta.
+
+    - La autenticación es opcional — sin token el agente opera en modo anónimo con capacidades limitadas.
+    - `session_id` identifica la conversación; usa el mismo valor para mantener el contexto entre mensajes.
+    - `history` es la lista de mensajes previos devuelta por el agente en turnos anteriores; envíala de vuelta para que el agente recuerde el contexto.
+    - Ejemplo de flujo: primer mensaje → `history: []`; siguientes mensajes → reenvía el `history` de la respuesta anterior.
+    """
     user_email = current_user.get("sub") if current_user else None
     user_role = current_user.get("role") if current_user else None
 
@@ -46,13 +44,6 @@ async def chat_endpoint(
             history=updated_history,
             user_email=user_email,
             user_role=user_role,
-        )
-    except APIStatusError as e:
-        logger.error("Groq APIStatusError %s: %s", e.status_code, e)
-        return ChatResponse(
-            reply=_groq_error_msg(e),
-            session_id=body.session_id,
-            history=body.history,
         )
     except Exception:
         logger.exception("Unexpected error in chat endpoint")

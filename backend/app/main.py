@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 
 from app.core.config import settings
 from app.core.database import init_db
-from app.routers import chat, admin, password_reset, accounts, auth, tickets, faq, troubleshooting, environment, actions, history
+from app.routers import chat, admin, password_reset, accounts, auth, tickets, faq, troubleshooting, environment, actions, history, database_access, dashboard
 
 
 @asynccontextmanager
@@ -17,14 +18,46 @@ app = FastAPI(
     title="ATOS — Agente Técnico de Operaciones de Soporte",
     version="0.1.0",
     lifespan=lifespan,
+    swagger_ui_parameters={"persistAuthorization": True},
 )
 
-origins = ["*"] if settings.environment == "development" else settings.origins_list
+
+def _custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        routes=app.routes,
+    )
+    schema.setdefault("components", {})["securitySchemes"] = {
+        "BearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
+    }
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = _custom_openapi
+
+# Always allow GitHub Pages + localhost; tunnel URL is open via wildcard in dev
+ALWAYS_ALLOWED = [
+    "https://atos.beluxio.org",
+    "https://beluxio.org",
+    "https://www.beluxio.org",
+    "https://beluxio.github.io",
+    "http://localhost:5173",
+    "http://localhost:5500",
+    "http://127.0.0.1:5173",
+]
+if settings.environment == "development":
+    origins = ["*"]
+else:
+    origins = list(set(ALWAYS_ALLOWED + settings.origins_list))
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=settings.environment != "development",
+    allow_credentials=False,   # JWT via Authorization header — credentials flag not needed
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -40,6 +73,8 @@ app.include_router(troubleshooting.router)
 app.include_router(environment.router)
 app.include_router(actions.router)
 app.include_router(history.router)
+app.include_router(database_access.router)
+app.include_router(dashboard.router)
 
 
 @app.get("/health")

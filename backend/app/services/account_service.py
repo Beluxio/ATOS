@@ -111,6 +111,23 @@ async def update_password(db: AsyncSession, email: str, new_password: str) -> di
     return {"status": "ok", "message": f"Contraseña actualizada para {email}."}
 
 
+async def update_job_role(db: AsyncSession, email: str, job_role: str | None) -> dict:
+    from app.core.job_role_policy import JOB_ROLES
+    if job_role and job_role not in JOB_ROLES:
+        return {"status": "error", "message": f"Job role inválido. Opciones: {', '.join(JOB_ROLES)}"}
+    email = _norm(email)
+    result = await db.execute(select(Account).where(_by_email(email)))
+    if not result.scalar_one_or_none():
+        return {"status": "error", "message": f"No existe cuenta con email {email}."}
+    await db.execute(
+        update(Account).where(_by_email(email))
+        .values(job_role=job_role, updated_at=datetime.now(UTC))
+    )
+    await db.commit()
+    label = job_role or "ninguno"
+    return {"status": "ok", "message": f"Job role de {email} actualizado a '{label}'."}
+
+
 async def update_role(db: AsyncSession, email: str, new_role: str) -> dict:
     if new_role not in ("user", "agent", "admin"):
         return {"status": "error", "message": "Rol inválido. Usa: user, agent, admin."}
@@ -134,6 +151,7 @@ def _serialize(a: Account) -> dict:
         "username": a.username,
         "status": a.status,
         "role": a.role,
+        "job_role": a.job_role,
         "failed_login_attempts": a.failed_login_attempts,
         "locked_until": a.locked_until.isoformat() if a.locked_until else None,
         "created_at": a.created_at.isoformat(),

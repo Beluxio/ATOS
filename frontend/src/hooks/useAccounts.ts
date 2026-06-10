@@ -7,6 +7,7 @@ export interface Account {
   username: string;
   status: "active" | "locked" | "pending";
   role: "user" | "agent" | "admin";
+  job_role: "frontend_dev" | "backend_dev" | "data_scientist" | null;
   failed_login_attempts: number;
   locked_until: string | null;
   created_at: string;
@@ -84,5 +85,21 @@ export function useAccounts(token: string | null) {
     [authHeaders, fetchAccounts]
   );
 
-  return { accounts, loading, error, success, fetchAccounts, register, toggleLock };
+  const updateJobRole = useCallback(
+    async (email: string, job_role: string | null) => {
+      try {
+        await fetch(`${BACKEND_URL}/api/accounts/${encodeURIComponent(email)}/job-role`, {
+          method: "PATCH",
+          headers: authHeaders(),
+          body: JSON.stringify({ job_role }),
+        });
+        await fetchAccounts();
+      } catch {
+        setError("Error al actualizar el job role.");
+      }
+    },
+    [authHeaders, fetchAccounts]
+  );
+
+  return { accounts, loading, error, success, fetchAccounts, register, toggleLock, updateJobRole };
 }

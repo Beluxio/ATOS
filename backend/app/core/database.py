@@ -24,6 +24,8 @@ async def init_db() -> None:
     import app.models.faq               # noqa: F401
     import app.models.troubleshooting   # noqa: F401
     import app.models.incident_history  # noqa: F401
+    import app.models.database_access      # noqa: F401
+    import app.models.database_access_log  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

@@ -4,7 +4,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
-    groq_api_key: str
+    openai_api_key: str
+    openai_model: str = "gpt-4.1-mini"
     database_url: str
     secret_key: str
     environment: str = "development"
