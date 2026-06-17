@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.core.database import init_db
 from app.core.limiter import limiter
 from app.core.scheduler import start_scheduler, stop_scheduler
-from app.routers import chat, admin, password_reset, accounts, auth, tickets, faq, troubleshooting, environment, actions, history, database_access, dashboard
+from app.routers import chat, admin, password_reset, accounts, auth, tickets, faq, troubleshooting, environment, actions, history, database_access, dashboard, export
 
 
 @asynccontextmanager
@@ -85,6 +85,7 @@ app.include_router(actions.router)
 app.include_router(history.router)
 app.include_router(database_access.router)
 app.include_router(dashboard.router)
+app.include_router(export.router)
 
 
 @app.get("/health")

@@ -221,8 +221,43 @@ export function DashboardView({ token }: { token: string | null }) {
 
       </div>
 
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <button className="btn-secondary" style={{ fontSize: 13 }} onClick={load}>↺ Actualizar métricas</button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {[
+            { label: "📋 Tickets",          path: "tickets" },
+            { label: "👥 Cuentas",          path: "accounts" },
+            { label: "🗄️ Accesos BD",       path: "db-access" },
+            { label: "🕒 Historial BD",     path: "db-access-logs" },
+            { label: "🤖 Audit Logs",       path: "audit-logs" },
+          ].map(({ label, path }) => (
+            <a
+              key={path}
+              href={`${BACKEND_URL}/api/export/${path}`}
+              download
+              onClick={e => {
+                e.preventDefault();
+                const a = document.createElement("a");
+                a.href = `${BACKEND_URL}/api/export/${path}`;
+                const headers = new Headers({ Authorization: `Bearer ${token}` });
+                fetch(a.href, { headers })
+                  .then(r => r.blob())
+                  .then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    a.href = url;
+                    a.download = `${path}_${new Date().toISOString().slice(0,10)}.csv`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  });
+              }}
+              style={{ textDecoration: "none" }}
+            >
+              <button className="btn-secondary" style={{ fontSize: 12, padding: "6px 12px" }}>
+                ⬇ {label}
+              </button>
+            </a>
+          ))}
+        </div>
+        <button className="btn-secondary" style={{ fontSize: 13 }} onClick={load}>↺ Actualizar</button>
       </div>
 
     </div>
