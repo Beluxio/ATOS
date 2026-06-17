@@ -30,8 +30,7 @@ Instala las siguientes herramientas antes de continuar:
 
 | Herramienta | Descarga |
 |---|---|
-| **Git** | https://git-scm.com/download/win |
-| **Docker Desktop** | https://www.docker.com/products/docker-desktop/ |
+| **Git** | https://git-scm.com/download/win |22222
 
 > Después de instalar Docker Desktop **reinicia el PC** antes de continuar.
 
