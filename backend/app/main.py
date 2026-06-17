@@ -5,13 +5,16 @@ from fastapi.openapi.utils import get_openapi
 
 from app.core.config import settings
 from app.core.database import init_db
+from app.core.scheduler import start_scheduler, stop_scheduler
 from app.routers import chat, admin, password_reset, accounts, auth, tickets, faq, troubleshooting, environment, actions, history, database_access, dashboard
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    start_scheduler()
     yield
+    stop_scheduler()
 
 
 app = FastAPI(

@@ -1,4 +1,4 @@
-from sqlalchemy import String, DateTime, Integer
+from sqlalchemy import String, DateTime, Integer, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, UTC
 from typing import Optional
@@ -17,6 +17,7 @@ class DatabaseAccess(Base):
     granted_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    expiry_warning_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

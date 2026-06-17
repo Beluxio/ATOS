@@ -33,6 +33,7 @@ async def init_db() -> None:
             "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user'",
             "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP WITH TIME ZONE",
+            "ALTER TABLE database_accesses ADD COLUMN IF NOT EXISTS expiry_warning_sent BOOLEAN NOT NULL DEFAULT FALSE",
         ]:
             await conn.execute(text(sql))
 
