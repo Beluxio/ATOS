@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, EmailStr, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.limiter import limiter
 from app.services import password_reset_service as svc
 
 router = APIRouter(prefix="/api/reset-password", tags=["reset-password"])
@@ -31,7 +32,8 @@ class ConfirmBody(BaseModel):
 
 
 @router.post("/request", summary="Solicitar reset de contraseña")
-async def request_reset(body: RequestBody, db: AsyncSession = Depends(get_db)):
+@limiter.limit("3/hour")
+async def request_reset(request: Request, body: RequestBody, db: AsyncSession = Depends(get_db)):
     """
     Genera un token de reset válido por 15 minutos para el email indicado.
 

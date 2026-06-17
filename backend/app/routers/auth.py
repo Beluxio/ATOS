@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, EmailStr, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.auth import get_current_user
+from app.core.limiter import limiter
 from app.services import auth_service as svc
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -18,7 +19,8 @@ class LoginBody(BaseModel):
 
 
 @router.post("/login", summary="Iniciar sesión")
-async def login(body: LoginBody, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(request: Request, body: LoginBody, db: AsyncSession = Depends(get_db)):
     """
     Autentica al usuario y devuelve un token JWT.
 

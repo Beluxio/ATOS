@@ -1,10 +1,11 @@
 import logging
 from typing import Optional
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.auth import get_current_user_optional
+from app.core.limiter import limiter
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.agent import agent
 
@@ -13,7 +14,9 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
 @router.post("", response_model=ChatResponse, summary="Enviar mensaje al agente")
+@limiter.limit("20/minute")
 async def chat_endpoint(
+    request: Request,
     body: ChatRequest,
     db: AsyncSession = Depends(get_db),
     current_user: Optional[dict] = Depends(get_current_user_optional),
