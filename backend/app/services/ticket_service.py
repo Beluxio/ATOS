@@ -117,16 +117,44 @@ async def update_status(
     if not ticket:
         return {"status": "error", "message": f"Ticket #{ticket_id} no encontrado."}
 
-    await db.execute(
-        update(Ticket)
-        .where(Ticket.id == ticket_id)
-        .values(status=new_status, updated_at=datetime.now(UTC))
-    )
+    values: dict = {"status": new_status, "updated_at": datetime.now(UTC)}
+    if new_status in ("resolved", "closed") and not ticket.resolved_at:
+        values["resolved_at"] = datetime.now(UTC)
+
+    await db.execute(update(Ticket).where(Ticket.id == ticket_id).values(**values))
 
     content = note or f"Estado actualizado a: {new_status}."
     db.add(TicketResponse(ticket_id=ticket_id, content=content, author=author, is_auto=True))
     await db.commit()
     await db.refresh(ticket)
+    return _serialize(ticket)
+
+
+async def assign_ticket(
+    db: AsyncSession,
+    ticket_id: int,
+    assigned_to: Optional[str],
+    assigned_by: str = "Panel",
+) -> dict:
+    result = await db.execute(select(Ticket).where(Ticket.id == ticket_id))
+    ticket = result.scalar_one_or_none()
+    if not ticket:
+        return {"status": "error", "message": f"Ticket #{ticket_id} no encontrado."}
+
+    await db.execute(
+        update(Ticket).where(Ticket.id == ticket_id)
+        .values(assigned_to=assigned_to, updated_at=datetime.now(UTC))
+    )
+    label = assigned_to or "nadie"
+    note = f"Asignado a: {label}." if assigned_to else "Asignación removida."
+    db.add(TicketResponse(ticket_id=ticket_id, content=note, author=assigned_by, is_auto=True))
+    await db.commit()
+    await db.refresh(ticket)
+
+    if assigned_to:
+        from app.core.email import send_ticket_assigned_email
+        await send_ticket_assigned_email(assigned_to, ticket_id, ticket.title, ticket.priority, assigned_by)
+
     return _serialize(ticket)
 
 
@@ -160,11 +188,18 @@ async def add_response(
     is_auto: bool = False,
 ) -> dict:
     result = await db.execute(select(Ticket).where(Ticket.id == ticket_id))
-    if not result.scalar_one_or_none():
+    ticket = result.scalar_one_or_none()
+    if not ticket:
         return {"status": "error", "message": f"Ticket #{ticket_id} no encontrado."}
 
     db.add(TicketResponse(ticket_id=ticket_id, content=content, author=author, is_auto=is_auto))
     await db.commit()
+
+    # Email de notificación cuando un agente/admin responde (no para respuestas automáticas)
+    if not is_auto and author.lower() not in ("atos", ticket.user_email):
+        from app.core.email import send_ticket_comment_email
+        await send_ticket_comment_email(ticket.user_email, ticket_id, ticket.title, author, content)
+
     return {"status": "ok", "message": "Respuesta añadida."}
 
 
@@ -220,6 +255,7 @@ def _serialize(t: Ticket) -> dict:
         "tags": t.tags,
         "user_email": t.user_email,
         "assigned_to": t.assigned_to,
+        "resolved_at": t.resolved_at.isoformat() if t.resolved_at else None,
         "created_at": t.created_at.isoformat(),
         "updated_at": t.updated_at.isoformat(),
         "responses": [_serialize_response(r) for r in (t.responses or [])],

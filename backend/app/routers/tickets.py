@@ -4,6 +4,7 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.auth import require_role
 from app.services import ticket_service as svc
 
 router = APIRouter(prefix="/api/tickets", tags=["tickets"])
@@ -100,6 +101,28 @@ async def add_response(ticket_id: int, body: AddResponseBody, db: AsyncSession =
     - La respuesta queda visible en el historial del ticket.
     """
     return await svc.add_response(db, ticket_id, body.content, body.author or "Agente", is_auto=False)
+
+
+class AssignBody(BaseModel):
+    assigned_to: Optional[str] = None
+
+
+@router.patch("/{ticket_id}/assign", summary="Asignar ticket a agente")
+async def assign_ticket(
+    ticket_id: int,
+    body: AssignBody,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_role("admin", "agent")),
+):
+    """
+    Asigna (o desasigna) un ticket a un agente.
+
+    - `assigned_to`: email del agente, o `null` para quitar la asignación.
+    - El agente asignado recibe un email de notificación.
+    - Requiere rol `admin` o `agent`.
+    """
+    assigned_by = current_user.get("sub", "Panel")
+    return await svc.assign_ticket(db, ticket_id, body.assigned_to, assigned_by)
 
 
 @router.post("/{ticket_id}/escalate", summary="Escalar ticket")

@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 
 from app.core.database import get_db
 from app.core.auth import require_role
@@ -109,11 +109,55 @@ async def get_dashboard(
 
     total_tool_calls = (await db.execute(select(func.count()).select_from(AuditLog))).scalar_one()
 
+    # ── SLA ──────────────────────────────────────────────────────────────────
+    SLA_HOURS = {"critical": 4, "high": 8, "medium": 24, "low": 72}
+
+    resolved_tickets = (await db.execute(
+        select(Ticket.priority, Ticket.created_at, Ticket.resolved_at)
+        .where(Ticket.resolved_at.isnot(None))
+    )).all()
+
+    sla_by_priority: dict[str, dict] = {}
+    for priority, sla_h in SLA_HOURS.items():
+        rows = [r for r in resolved_tickets if r.priority == priority]
+        if not rows:
+            sla_by_priority[priority] = {"avg_hours": None, "within_sla": None, "total": 0}
+            continue
+        hours = []
+        within = 0
+        for r in rows:
+            ca = r.created_at.replace(tzinfo=timezone.utc) if r.created_at.tzinfo is None else r.created_at
+            ra = r.resolved_at.replace(tzinfo=timezone.utc) if r.resolved_at.tzinfo is None else r.resolved_at
+            h = (ra - ca).total_seconds() / 3600
+            hours.append(h)
+            if h <= sla_h:
+                within += 1
+        avg = round(sum(hours) / len(hours), 1)
+        sla_by_priority[priority] = {
+            "avg_hours": avg,
+            "within_sla": round(within / len(rows) * 100),
+            "total": len(rows),
+            "sla_limit_hours": sla_h,
+        }
+
+    # ── Tickets por agente asignado ───────────────────────────────────────────
+    agent_rows = (await db.execute(
+        select(Ticket.assigned_to, func.count().label("n"))
+        .where(Ticket.assigned_to.isnot(None))
+        .group_by(Ticket.assigned_to)
+        .order_by(func.count().desc())
+    )).all()
+    tickets_by_agent = {r.assigned_to: r.n for r in agent_rows}
+
     return {
         "tickets": {
             "total": total_tickets,
             "by_status": ticket_by_status,
             "by_priority": ticket_by_priority,
+        },
+        "sla": {
+            "by_priority": sla_by_priority,
+            "tickets_by_agent": tickets_by_agent,
         },
         "accounts": {
             "total": total_accounts,
@@ -137,3 +181,47 @@ async def get_dashboard(
             "top_tools": top_tools,
         },
     }
+
+
+@router.get("/trend", summary="Tendencia semanal de tickets y accesos BD")
+async def get_trend(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_role("admin", "agent")),
+):
+    """Devuelve tickets y accesos BD creados por semana en las últimas 8 semanas."""
+    eight_weeks_ago = datetime.now(timezone.utc) - timedelta(weeks=8)
+
+    ticket_rows = (await db.execute(
+        select(
+            func.date_trunc("week", Ticket.created_at).label("week"),
+            func.count().label("n"),
+        )
+        .where(Ticket.created_at >= eight_weeks_ago)
+        .group_by(text("1"))
+        .order_by(text("1"))
+    )).all()
+
+    access_rows = (await db.execute(
+        select(
+            func.date_trunc("week", DatabaseAccess.created_at).label("week"),
+            func.count().label("n"),
+        )
+        .where(DatabaseAccess.created_at >= eight_weeks_ago)
+        .group_by(text("1"))
+        .order_by(text("1"))
+    )).all()
+
+    def _label(dt) -> str:
+        if hasattr(dt, "tzinfo") and dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.strftime("%d/%m")
+
+    ticket_map = {_label(r.week): r.n for r in ticket_rows}
+    access_map = {_label(r.week): r.n for r in access_rows}
+
+    all_weeks = sorted(set(ticket_map) | set(access_map))
+    data = [
+        {"week": w, "tickets": ticket_map.get(w, 0), "accesses": access_map.get(w, 0)}
+        for w in all_weeks
+    ]
+    return {"weeks": data}

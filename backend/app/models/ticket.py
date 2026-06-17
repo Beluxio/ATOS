@@ -18,6 +18,7 @@ class Ticket(Base):
     tags: Mapped[list] = mapped_column(JSONB, default=list)
     user_email: Mapped[str] = mapped_column(String(255), index=True)
     assigned_to: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

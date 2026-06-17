@@ -141,6 +141,151 @@ async def send_expiry_warning_email(to_email: str, database_name: str, days_left
     })
 
 
+async def send_ticket_assigned_email(
+    to_email: str,
+    ticket_id: int,
+    ticket_title: str,
+    priority: str,
+    assigned_by: str,
+) -> bool:
+    """Notifica al agente que le fue asignado un ticket."""
+    priority_colors = {"critical": "#dc2626", "high": "#f59e0b", "medium": "#818cf8", "low": "#6b7280"}
+    color = priority_colors.get(priority, "#818cf8")
+    html = f"""
+    <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
+      <div style="margin-bottom: 24px;">
+        <span style="font-size: 22px; font-weight: 700; color: #1f2937;">⚙️ ATOS</span>
+        <span style="font-size: 14px; color: #6b7280; margin-left: 8px;">Soporte Técnico</span>
+      </div>
+      <h2 style="color: #111827; font-size: 18px; margin-bottom: 8px;">🎫 Ticket asignado</h2>
+      <p style="color: #374151; font-size: 14px; margin-bottom: 20px;">
+        <strong>{assigned_by}</strong> te asignó el ticket <strong>#{ticket_id}</strong>:
+      </p>
+      <div style="background:#f9fafb; border:1px solid #e5e7eb; padding:16px;
+                  border-radius:8px; margin-bottom:20px;">
+        <div style="font-size:15px; font-weight:600; color:#111827; margin-bottom:8px;">
+          {ticket_title}
+        </div>
+        <span style="display:inline-block; background:{color}22; color:{color};
+              padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600;">
+          {priority.upper()}
+        </span>
+      </div>
+      <p style="color:#6b7280; font-size:13px;">
+        Accede al panel de ATOS para ver el ticket completo y tomar acción.
+      </p>
+    </div>
+    """
+    return await _send({
+        "from": settings.email_from,
+        "to": [to_email],
+        "subject": f"[ATOS] Ticket #{ticket_id} asignado — {ticket_title}",
+        "html": html,
+    })
+
+
+async def send_ticket_comment_email(
+    to_email: str,
+    ticket_id: int,
+    ticket_title: str,
+    author: str,
+    content: str,
+) -> bool:
+    """Notifica al creador del ticket que recibió una respuesta."""
+    html = f"""
+    <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
+      <div style="margin-bottom: 24px;">
+        <span style="font-size: 22px; font-weight: 700; color: #1f2937;">⚙️ ATOS</span>
+        <span style="font-size: 14px; color: #6b7280; margin-left: 8px;">Soporte Técnico</span>
+      </div>
+      <h2 style="color: #111827; font-size: 18px; margin-bottom: 8px;">
+        Nueva respuesta en tu ticket #{ticket_id}
+      </h2>
+      <p style="color: #374151; font-size: 14px; margin-bottom: 4px;">
+        <strong>{author}</strong> respondió en:
+        <em style="color:#6b7280;">{ticket_title}</em>
+      </p>
+      <div style="background:#f9fafb; border:1px solid #e5e7eb; padding:16px;
+                  border-radius:8px; margin: 16px 0;">
+        <p style="color:#111827; font-size:14px; margin:0; line-height:1.6;">{content}</p>
+      </div>
+      <p style="color:#6b7280; font-size:13px;">
+        Accede al panel de ATOS para ver el ticket completo y responder.
+      </p>
+    </div>
+    """
+    return await _send({
+        "from": settings.email_from,
+        "to": [to_email],
+        "subject": f"Re: Ticket #{ticket_id} — {ticket_title}",
+        "html": html,
+    })
+
+
+async def send_welcome_email(
+    to_email: str,
+    username: str,
+    password: str,
+    role: str,
+) -> bool:
+    """Email de bienvenida al crear una nueva cuenta."""
+    portal_url = "https://portal.beluxio.org"
+    atos_url = "https://atos.beluxio.org"
+    role_label = {"user": "Usuario", "agent": "Agente de soporte", "admin": "Administrador"}.get(role, role)
+    html = f"""
+    <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px;">
+      <div style="margin-bottom: 24px;">
+        <span style="font-size: 22px; font-weight: 700; color: #1f2937;">⚙️ ATOS</span>
+        <span style="font-size: 14px; color: #6b7280; margin-left: 8px;">Soporte Técnico — DataCo Analytics</span>
+      </div>
+      <h2 style="color: #111827; font-size: 18px; margin-bottom: 8px;">Bienvenido/a, {username} 👋</h2>
+      <p style="color: #374151; font-size: 14px; margin-bottom: 20px;">
+        Se ha creado tu cuenta en el sistema ATOS de DataCo Analytics. Aquí están tus credenciales de acceso:
+      </p>
+      <div style="background:#f9fafb; border:1px solid #e5e7eb; padding:20px;
+                  border-radius:8px; margin-bottom:20px;">
+        <div style="margin-bottom:12px;">
+          <span style="font-size:12px; color:#6b7280; display:block; margin-bottom:4px;">EMAIL</span>
+          <code style="font-size:14px; font-weight:600; color:#111827;">{to_email}</code>
+        </div>
+        <div style="margin-bottom:12px;">
+          <span style="font-size:12px; color:#6b7280; display:block; margin-bottom:4px;">USUARIO</span>
+          <code style="font-size:14px; font-weight:600; color:#111827;">{username}</code>
+        </div>
+        <div style="margin-bottom:12px;">
+          <span style="font-size:12px; color:#6b7280; display:block; margin-bottom:4px;">CONTRASEÑA INICIAL</span>
+          <code style="font-size:14px; font-weight:600; color:#111827;">{password}</code>
+        </div>
+        <div>
+          <span style="font-size:12px; color:#6b7280; display:block; margin-bottom:4px;">ROL</span>
+          <span style="font-size:14px; font-weight:600; color:#111827;">{role_label}</span>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-bottom:24px;">
+        <a href="{portal_url}" style="display:inline-block; background:#4f46e5; color:#fff;
+           padding:10px 20px; border-radius:6px; text-decoration:none; font-size:14px; font-weight:600;">
+          🌐 Abrir Portal DataCo
+        </a>
+        <a href="{atos_url}" style="display:inline-block; background:#0f172a; color:#fff;
+           padding:10px 20px; border-radius:6px; text-decoration:none; font-size:14px; font-weight:600;
+           border:1px solid #334155;">
+          ⚙️ Panel ATOS
+        </a>
+      </div>
+      <p style="color:#6b7280; font-size:13px;">
+        Por seguridad, te recomendamos cambiar tu contraseña tras el primer inicio de sesión.<br>
+        Si tienes dudas, usa el chat de ATOS o contacta al equipo de soporte.
+      </p>
+    </div>
+    """
+    return await _send({
+        "from": settings.email_from,
+        "to": [to_email],
+        "subject": "Bienvenido/a a ATOS — DataCo Analytics",
+        "html": html,
+    })
+
+
 async def send_expiry_email(to_email: str, database_name: str) -> bool:
     """Notifica al usuario que su acceso a una BD ha expirado."""
     html = f"""

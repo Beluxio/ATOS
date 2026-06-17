@@ -13,6 +13,8 @@ import { DatabaseAccessView } from "./components/DatabaseAccessView";
 import { DashboardView } from "./components/DashboardView";
 import { useChat } from "./hooks/useChat";
 import { useAuth } from "./hooks/useAuth";
+import { useNotifications } from "./hooks/useNotifications";
+import { NotificationBell } from "./components/NotificationBell";
 import "./App.css";
 import { useState } from "react";
 
@@ -33,6 +35,7 @@ export default function App() {
   const [view, setView] = useState<View>("chat");
   const { token, user, loading: authLoading, error: authError, login, logout } = useAuth();
   const { messages, loading, backendOnline, sendMessage, checkBackend } = useChat(token);
+  const { notifications, unread, markAllRead, dismiss } = useNotifications(token);
 
   useEffect(() => {
     checkBackend();
@@ -66,6 +69,12 @@ export default function App() {
             <div className="topbar-title">{meta.title}</div>
             <div className="topbar-subtitle">{meta.subtitle}</div>
           </div>
+          <NotificationBell
+            notifications={notifications}
+            unread={unread}
+            onMarkAllRead={markAllRead}
+            onDismiss={dismiss}
+          />
           <span
             className="status-dot"
             style={{
@@ -90,7 +99,7 @@ export default function App() {
         >
           {view === "chat"    && <ChatView messages={messages} loading={loading} onSend={sendMessage} />}
           {view === "users"   && <UsersView token={token} />}
-          {view === "tickets" && <TicketsView token={token} userEmail={user.email} />}
+          {view === "tickets" && <TicketsView token={token} userEmail={user.email} userRole={user.role} />}
           {view === "logs"    && <LogsView />}
           {view === "faq"             && <FAQView />}
           {view === "troubleshooting" && <TroubleshootingView />}

@@ -19,6 +19,7 @@ export interface Ticket {
   tags: string[];
   user_email: string;
   assigned_to: string | null;
+  resolved_at: string | null;
   created_at: string;
   updated_at: string;
   responses: TicketResponse[];
@@ -116,13 +117,13 @@ export function useTickets(token: string | null) {
   );
 
   const addResponse = useCallback(
-    async (id: number, content: string) => {
+    async (id: number, content: string, author?: string) => {
       setError(null);
       try {
         await fetch(`${BACKEND_URL}/api/tickets/${id}/responses`, {
           method: "POST",
           headers: headers(),
-          body: JSON.stringify({ content, author: "Agente" }),
+          body: JSON.stringify({ content, author: author || "Agente" }),
         });
         await fetchTicket(id);
         setSuccess("Respuesta añadida.");
@@ -133,9 +134,30 @@ export function useTickets(token: string | null) {
     [headers, fetchTicket]
   );
 
+  const assignTicket = useCallback(
+    async (id: number, assigned_to: string | null) => {
+      setError(null);
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/tickets/${id}/assign`, {
+          method: "PATCH",
+          headers: headers(),
+          body: JSON.stringify({ assigned_to }),
+        });
+        const data = await res.json();
+        if (data.id) {
+          setSelected(data);
+          await fetchTickets();
+        }
+      } catch {
+        setError("Error al asignar el ticket.");
+      }
+    },
+    [headers, fetchTickets]
+  );
+
   return {
     tickets, selected, loading, error, success,
-    fetchTickets, fetchTicket, createTicket, updateStatus, addResponse,
+    fetchTickets, fetchTicket, createTicket, updateStatus, addResponse, assignTicket,
     clearSelected: () => setSelected(null),
   };
 }

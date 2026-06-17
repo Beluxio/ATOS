@@ -38,6 +38,9 @@ async def register(db: AsyncSession, email: str, username: str, password: str, r
     await db.commit()
     await db.refresh(account)
 
+    from app.core.email import send_welcome_email
+    await send_welcome_email(email, username, password, role)
+
     return {
         "status": "ok",
         "message": f"Cuenta creada exitosamente para {username} ({email}).",

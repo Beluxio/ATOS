@@ -1,11 +1,26 @@
 import { useEffect, useState, useCallback } from "react";
 import { BACKEND_URL } from "../config";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  Legend, ResponsiveContainer,
+} from "recharts";
+
+interface SlaEntry {
+  avg_hours: number | null;
+  within_sla: number | null;
+  total: number;
+  sla_limit_hours: number;
+}
 
 interface DashboardData {
   tickets: {
     total: number;
     by_status: Record<string, number>;
     by_priority: Record<string, number>;
+  };
+  sla: {
+    by_priority: Record<string, SlaEntry>;
+    tickets_by_agent: Record<string, number>;
   };
   accounts: {
     total: number;
@@ -85,8 +100,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+interface TrendPoint { week: string; tickets: number; accesses: number; }
+
 export function DashboardView({ token }: { token: string | null }) {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [trend, setTrend] = useState<TrendPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -94,11 +112,16 @@ export function DashboardView({ token }: { token: string | null }) {
     setLoading(true);
     setError("");
     try {
-      const r = await fetch(`${BACKEND_URL}/api/dashboard`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!r.ok) { setError("Error al cargar métricas."); return; }
-      setData(await r.json());
+      const [dashRes, trendRes] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/dashboard`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${BACKEND_URL}/api/dashboard/trend`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      if (!dashRes.ok) { setError("Error al cargar métricas."); return; }
+      setData(await dashRes.json());
+      if (trendRes.ok) {
+        const t = await trendRes.json();
+        setTrend(t.weeks || []);
+      }
     } catch { setError("Sin conexión con el servidor."); }
     finally { setLoading(false); }
   }, [token]);
@@ -220,6 +243,77 @@ export function DashboardView({ token }: { token: string | null }) {
         </Section>
 
       </div>
+
+      {/* SLA + agentes */}
+      {data.sla && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+
+          <Section title="⏱️ SLA por prioridad">
+            {(["critical", "high", "medium", "low"] as const).map(p => {
+              const e = data.sla.by_priority[p];
+              if (!e || e.total === 0) return (
+                <div key={p} style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
+                  <span style={{ color: PRIORITY_COLORS[p], fontWeight: 600, textTransform: "uppercase", fontSize: 11 }}>{p}</span>
+                  {" — Sin datos"}
+                </div>
+              );
+              const ok = e.within_sla ?? 0;
+              return (
+                <div key={p} style={{ marginBottom: 14 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                    <span style={{ color: PRIORITY_COLORS[p], fontWeight: 600, textTransform: "uppercase" }}>{p}</span>
+                    <span style={{ color: ok >= 80 ? "#4ade80" : ok >= 50 ? "#facc15" : "#f87171", fontWeight: 700 }}>
+                      {ok}% en SLA
+                    </span>
+                  </div>
+                  <div style={{ height: 6, background: "#2a2a3a", borderRadius: 3, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${ok}%`, borderRadius: 3, transition: "width 0.6s",
+                      background: ok >= 80 ? "#4ade80" : ok >= 50 ? "#facc15" : "#f87171" }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 3 }}>
+                    Prom. {e.avg_hours}h · límite {e.sla_limit_hours}h · {e.total} resueltos
+                  </div>
+                </div>
+              );
+            })}
+          </Section>
+
+          <Section title="👤 Tickets por agente">
+            {Object.keys(data.sla.tickets_by_agent).length === 0
+              ? <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Sin tickets asignados aún.</div>
+              : Object.entries(data.sla.tickets_by_agent).map(([agent, n]) => (
+                <Bar key={agent} label={agent.split("@")[0]} value={n}
+                  max={Math.max(...Object.values(data.sla.tickets_by_agent))}
+                  color="#818cf8" />
+              ))
+            }
+          </Section>
+
+        </div>
+      )}
+
+      {/* Trend chart */}
+      {trend.length > 0 && (
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: 20 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 16 }}>📈 Evolución semanal (últimas 8 semanas)</div>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={trend} margin={{ top: 4, right: 16, left: -16, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
+              <XAxis dataKey="week" tick={{ fill: "#6b7280", fontSize: 11 }} />
+              <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} allowDecimals={false} />
+              <Tooltip
+                contentStyle={{ background: "#1a1a2e", border: "1px solid #2a2a3a", borderRadius: 8, fontSize: 12 }}
+                labelStyle={{ color: "#f0f0f0" }}
+              />
+              <Legend wrapperStyle={{ fontSize: 12, color: "#9ca3af" }} />
+              <Line type="monotone" dataKey="tickets" stroke="#818cf8" strokeWidth={2}
+                dot={{ fill: "#818cf8", r: 3 }} name="Tickets" activeDot={{ r: 5 }} />
+              <Line type="monotone" dataKey="accesses" stroke="#38bdf8" strokeWidth={2}
+                dot={{ fill: "#38bdf8", r: 3 }} name="Accesos BD" activeDot={{ r: 5 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
