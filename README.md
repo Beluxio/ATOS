@@ -73,7 +73,7 @@ docker-compose up -d
 
 Verifica que funciona (~30 segundos después):
 ```powershell
-curl http://localhost:8002/health
+curl http://localhost:8250/health
 # Respuesta esperada: {"status":"ok","service":"ATOS API"}
 ```
 

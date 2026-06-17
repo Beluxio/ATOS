@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.auth import get_current_user_optional
 from app.core.limiter import limiter
+from app.core.guardrails import check_message
+from app.core.security import log_audit
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.agent import agent
 
@@ -25,13 +27,32 @@ async def chat_endpoint(
     Envía un mensaje al agente ATOS y recibe una respuesta.
 
     - La autenticación es opcional — sin token el agente opera en modo anónimo con capacidades limitadas.
+    - Los mensajes pasan por guardrails de contenido antes de llegar al agente.
     - `session_id` identifica la conversación; usa el mismo valor para mantener el contexto entre mensajes.
-    - `history` es la lista de mensajes previos devuelta por el agente en turnos anteriores; envíala de vuelta para que el agente recuerde el contexto.
-    - Ejemplo de flujo: primer mensaje → `history: []`; siguientes mensajes → reenvía el `history` de la respuesta anterior.
+    - `history` es la lista de mensajes previos devuelta por el agente en turnos anteriores.
     """
     user_email = current_user.get("sub") if current_user else None
     user_role = current_user.get("role") if current_user else None
 
+    # ── Guardrails ────────────────────────────────────────────────────────────
+    guard = await check_message(body.message)
+    if guard.blocked:
+        await log_audit(
+            db,
+            tool_name="content_violation",
+            params={"message": body.message[:500], "user_email": user_email, "category": guard.category},
+            result={"blocked": True, "category": guard.category},
+            session_id=body.session_id,
+        )
+        return ChatResponse(
+            reply=guard.policy_message,
+            session_id=body.session_id,
+            history=body.history,
+            user_email=user_email,
+            user_role=user_role,
+        )
+
+    # ── Agente ────────────────────────────────────────────────────────────────
     try:
         reply, updated_history = await agent.chat(
             message=body.message,
