@@ -32,15 +32,6 @@ Instala las siguientes herramientas antes de continuar:
 |---|---|
 | **Git** | https://git-scm.com/download/win |
 | **Docker Desktop** | https://www.docker.com/products/docker-desktop/ |
-| **cloudflared** | Ver instrucciones abajo |
-
-**Instalar cloudflared** — PowerShell como administrador:
-```powershell
-winget install --id Cloudflare.cloudflared
-```
-Si `winget` no funciona: descarga `cloudflared-windows-amd64.exe` desde
-https://github.com/cloudflare/cloudflared/releases/latest,
-renómbralo a `cloudflared.exe` y muévelo a `C:\Windows\System32\`.
 
 > Después de instalar Docker Desktop **reinicia el PC** antes de continuar.
 
@@ -70,39 +61,12 @@ copy backend\.env.example backend\.env
 notepad backend\.env
 ```
 
-### 3. Configurar el túnel de Cloudflare
-El administrador te enviará 3 archivos:
-- `config.yml`
-- `cert.pem`
-- `956c7924-0310-44a6-b0c9-d322aeb14037.json`
-
-Crea la carpeta del túnel:
-```powershell
-mkdir "$env:USERPROFILE\.cloudflared"
-```
-
-Copia los 3 archivos dentro de `C:\Users\TU_USUARIO\.cloudflared\`
-
-Abre `config.yml` con el Bloc de notas y reemplaza `TU_USUARIO` con tu nombre de usuario de Windows:
-```yaml
-tunnel: 956c7924-0310-44a6-b0c9-d322aeb14037
-credentials-file: C:\Users\TU_USUARIO\.cloudflared\956c7924-0310-44a6-b0c9-d322aeb14037.json
-
-ingress:
-  - hostname: api.beluxio.org
-    service: http://localhost:8002
-  - service: http_status:404
-```
-
-> Para conocer tu nombre de usuario exacto: `echo $env:USERNAME`
-
 ---
 
 ## Levantar el sistema
 
-Necesitas **dos terminales** abiertas al mismo tiempo.
+Un solo comando levanta el backend, la base de datos y el túnel de Cloudflare:
 
-**Terminal 1 — Backend:**
 ```powershell
 docker-compose up -d
 ```
@@ -113,12 +77,7 @@ curl http://localhost:8002/health
 # Respuesta esperada: {"status":"ok","service":"ATOS API"}
 ```
 
-**Terminal 2 — Túnel (mantener abierta):**
-```powershell
-cloudflared tunnel run atos-api
-```
-
-Cuando veas `Connection established`, el sistema está online en https://api.beluxio.org.
+El túnel conecta automáticamente y `api.beluxio.org` queda online.
 
 ---
 
@@ -126,24 +85,21 @@ Cuando veas `Connection established`, el sistema está online en https://api.bel
 
 ### Encender
 ```powershell
-# Terminal 1
 docker-compose up -d
-
-# Terminal 2 (dejar abierta)
-cloudflared tunnel run atos-api
 ```
 
 ### Apagar
 ```powershell
-# Ctrl+C en la Terminal 2
-
-# Terminal 1
 docker-compose down
 ```
 
 ### Ver logs (para depurar)
 ```powershell
+# API
 docker logs atos-api-1 -f
+
+# Túnel
+docker logs atos-tunnel-1 -f
 ```
 
 ---

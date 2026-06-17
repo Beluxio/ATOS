@@ -29,5 +29,12 @@ services:
       db:
         condition: service_healthy
 
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run --token eyJhIjoiN2Q1ZDVmOWI1NWYxZDRhNGFmNTlkNzMzZGUzMDZiM2YiLCJ0IjoiN2FkMmVhZjAtZTFjNS00NjM0LTkyNjgtYjYwZmE1MDQ2YzkzIiwicyI6Ik5URTVPVFl4T0dZdE9HWmlOUzAwTlRreExUbGxOVEF0Wm1RelpHSTNPV0kyWmpjNCJ9
+    restart: unless-stopped
+    depends_on:
+      - api
+
 volumes:
   postgres_data:
